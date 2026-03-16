@@ -1,0 +1,31 @@
+name: CI — Maven Build
+
+on:
+  push:
+    branches: [main, develop, feature/gha-test]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        id: build
+        uses: <CLIENT_ORG>/github-common-actions/.github/actions/maven-build@feature/maven-build-action
+        with:
+          java-version: '17'
+          skip-tests: 'false'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: ${{ steps.build.outputs.artifact-path }}
+          retention-days: 1

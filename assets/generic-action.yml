@@ -1,0 +1,104 @@
+name: 'Maven Build'
+description: 'Generic Maven build action with Java setup,
+  dependency caching, optional settings.xml, and artifact detection.'
+
+inputs:
+  java-version:
+    description: 'Java version to use.'
+    required: false
+    default: '17'
+
+  java-distribution:
+    description: 'JDK distribution.'
+    required: false
+    default: 'temurin'
+
+  maven-goals:
+    description: 'Maven goals to run.'
+    required: false
+    default: 'clean package'
+
+  skip-tests:
+    description: 'Skip test execution.'
+    required: false
+    default: 'false'
+
+  working-directory:
+    description: 'Directory containing pom.xml.'
+    required: false
+    default: '.'
+
+  build-args:
+    description: 'Additional Maven -D flags and arguments.'
+    required: false
+    default: ''
+
+  settings-xml-path:
+    description: 'Path to settings.xml relative to workspace
+      root. Leave empty to use default Maven Central.'
+    required: false
+    default: ''
+
+outputs:
+  artifact-path:
+    description: 'Relative path to the built .jar'
+    value: ${{ steps.find-artifact.outputs.artifact-path }}
+
+  artifact-name:
+    description: 'Filename of the built .jar'
+    value: ${{ steps.find-artifact.outputs.artifact-name }}
+
+runs:
+  using: 'composite'
+  steps:
+
+    - name: Set up Java ${{ inputs.java-version }}
+      uses: actions/setup-java@v5
+      with:
+        distribution: ${{ inputs.java-distribution }}
+        java-version: ${{ inputs.java-version }}
+        cache: 'maven'
+        cache-dependency-path: '${{ inputs.working-directory }}/pom.xml'
+
+    - name: Validate settings.xml
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.settings-xml-path }}" ] && \
+           [ ! -f "${{ inputs.settings-xml-path }}" ]; then
+          echo "::error::settings.xml not found \
+            at '${{ inputs.settings-xml-path }}'."
+          exit 1
+        fi
+
+    - name: Maven build
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        SETTINGS_PATH: ${{ inputs.settings-xml-path }}
+      run: |
+        SETTINGS_ARG=""
+        if [ -n "$SETTINGS_PATH" ]; then
+          SETTINGS_ARG="-s $GITHUB_WORKSPACE/$SETTINGS_PATH"
+        fi
+
+        mvn ${{ inputs.maven-goals }} \
+          -B \
+          -DskipTests=${{ inputs.skip-tests }} \
+          $SETTINGS_ARG \
+          ${{ inputs.build-args }}
+
+    - name: Find built artifact
+      id: find-artifact
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        JAR_PATH=$(find target -maxdepth 1 -name "*.jar" \
+          ! -name "*sources*" ! -name "*javadoc*" \
+          | head -1)
+        if [ -z "$JAR_PATH" ]; then
+          echo "::error::No .jar found in target/."
+          exit 1
+        fi
+        echo "artifact-path=$JAR_PATH" >> $GITHUB_OUTPUT
+        echo "artifact-name=$(basename $JAR_PATH)" >> $GITHUB_OUTPUT
+        echo "Built: $(basename $JAR_PATH)"
