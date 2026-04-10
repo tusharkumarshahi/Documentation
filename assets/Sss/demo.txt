@@ -1,1 +1,11 @@
 hi
+
+Terraform script for PostgreSQL Flexible Server is ready. It provisions the DB with VNet integration (delegated subnet + private DNS), stores credentials in Key Vault, and runs via a GitHub Actions workflow using the existing Delinea secret chain.
+
+Blocked on the following dependencies:
+
+Storage Account for Terraform state (with tfstate container + Blob Data Contributor for OIDC SP)
+Contributor role on rg-20-npe-k8s-01 for the SP
+Key Vault Secrets Officer on kv-20-terradopipeline for the SP
+
+Once unblocked, remaining configs will be completed, DB credentials created in Delinea, and terraform apply executed.
